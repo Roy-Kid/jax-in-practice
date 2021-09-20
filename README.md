@@ -1,6 +1,8 @@
 # jax-in-practice
-1. 自动微分原理
-1. 矩阵求导原理
-1. grad
-1. jit
-1. vmap
+1. AD in mathematics
+1. AD in computation
+1. Automatic differentiation in jax
+1. Just-in-time compilation in jax
+1. Vectorization 
+1. Parallelization 
+
