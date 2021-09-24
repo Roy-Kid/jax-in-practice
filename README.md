@@ -1,8 +1,33 @@
-# jax-in-practice
-1. AD in mathematics
-1. AD in computation
-1. Automatic differentiation in jax
-1. Just-in-time compilation in jax
-1. Vectorization 
-1. Parallelization 
+# 自动微分编程: JAX实现
 
+0. 前言
+
+## 上部: 理论基础
+
+0. 函数, 多元函数
+1. 求导，偏导
+2. 求导的程序实现
+    * 手动实现
+    * 有限差分
+    * 符号推导
+3. 自动微分
+    * 前向模式
+    * 反向模式
+    * ...
+## 中部: JAX基础
+
+0. 语法基础
+    * jnp, random, 精度
+1. grad
+1. jit
+1. vmap/pmap
+
+## 下部: 实践
+
+0. 用JAX的方式思考
+1. 
+
+## 附录
+* 名词表
+* 性能问题
+* 不同库之间比较
