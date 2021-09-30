@@ -54,7 +54,7 @@ class Vertex(Point):
         return len(self.adjacent)
 
 class Graph(object):
-    def __init__(self, vertex_list: Optional[List[Vertex]]=None, edge_list: Optional[List[Edge]]=None):
+    def __init__(self, vertex_list: Optional[List[Vertex]], edge_list: Optional[List[Edge]]=None):
         self.vertex_list: List[Vertex] = [] if vertex_list == None else vertex_list
         self.edge_list: List[Edge] = [] if edge_list == None else edge_list
 
