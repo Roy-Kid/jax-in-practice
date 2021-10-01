@@ -77,6 +77,17 @@ $$
 \end{array}\right]
 $$
 
+## 梯度向量积
+
+梯度可以给出函数上某一点变化趋势最大的方向, 也可以给出不在这个方向上而是其他方向上变化的速度. 使用这个梯度点积一个单位向量所得出的结果既是在这个方向上的斜率, 也成为方向导数
+
+$$
+\begin{align}
+    & \nabla_v f(x) = \lim_{\varepsilon \to 0} \frac{f(x+\varepsilon \cdot v)-f(x)}{\varepsilon} \\
+    & \nabla_v f(x) = \nabla f(x) \cdot v = \sum_{n_1}^{N} f_n(x)\cdot v_n = \sum_{n_1}^{N}\frac \\{\partial f(x)}{\partial x_n} \cdot v_n
+\end{align}
+$$
+
 ## 雅可比矩阵
 
 考虑一个光滑的的多变量函数$f:\mathbb R^N \to \mathbb R^M$, 它的雅可比函数写作$J_f:\mathbb R^N\to (\mathbb R^N \times \mathbb R^M)$, 输入一个$N$维的向量, 输出一个$M \times N$的矩阵, 其中每个元素都是某一个分量的导数

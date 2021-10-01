@@ -9,17 +9,15 @@
 ```python
 class Variable:
 
-    def __init__(self, value):
+    def __init__(self, value, diff=0):
         self.value = value
-        self.diff = 0
+        self.diff = diff
 
     def __add__(self, value):
-        self.diff = self.diff
-        return self.value + value
+        return Variable(self.value + value, diff)
 
     def __multi__(self, value):
-        self.diff = value
-        return self.value * value
+        return Variable(self.value * value, value)
 ```
 
 虽然直观且易于理解, 但是对于复杂的数学过程需要编写大量的规则且效率低下. 
@@ -84,25 +82,80 @@ out: DeviceArray(True, dtype=bool)
 
 ### 前向模式
 
-一般计算一个函数, 都是输入一个原始值, 流经整个计算过程得到输出. 前向模式使用了二元数以同时追踪求值计算和导数计算的中间变量.  $x$的二元数写作$\left< x, \dot x\right>$, 即$x$及其导数$\dot x$. 二元数之间可以进行运算, 遵从值与值计算, 导数与导数计算. 例如
+一般计算一个函数, 都是输入一个原始值, 流经整个计算过程得到输出. 前向模式使用了二元数(dual number)以同时追踪求值计算和导数计算的中间变量.  $x$的二元数写作$\left< x, \dot x\right>$, 即$x$及其导数$\dot x$. 二元数之间可以进行运算, 遵从值与值计算, 导数与导数计算.
 
+相反数:
+$$
+-\langle u, \dot{u}\rangle=\langle-u,-\dot{u}\rangle
+$$
+求和:
+$$
+\langle u, \dot{u}\rangle + \langle v, \dot{v}\rangle=\langle u+v, \dot{u} + \dot v \rangle
+$$
+作差:
+$$
+\langle u, \dot{u}\rangle - \langle v, \dot{v}\rangle=\langle u-v, \dot{u} - \dot v \rangle
+$$
 乘积:
 $$
 \langle u, \dot{u}\rangle \cdot \langle v, \dot{v}\rangle=\langle u\cdot v, \dot{u} \cdot \dot v \rangle
 $$
+相除:
+$$
+\langle u, \dot{u}\rangle / \langle v, \dot{v}\rangle=\langle u / v, \dot{u} / v - u/v^2 \cdot \dot v \rangle
+$$
+取对数:
+$$
+\log\langle u, \dot{u}\rangle =\langle \text{log} u, \frac{\dot{u}}{u}  \rangle
+$$
 
 例如有一个函数
+
+$$
+    f(x) = x_1 \cdot x_2 + e^{x_2}
+$$
+
+求$x=\left[ 3, 5 \right]^\mathsf T$在$(1, 1)$方向上的导数, 可以写成
+$$
+    \begin{align}
+        f(x) & = x_1 \cdot x_2 + e^{x_2} \\
+        & = \langle 3, 1\rangle \cdot \langle 5, 1\rangle + \exp(\langle 5, 1\rangle) \\
+        & = \langle 15, 8\rangle + \langle \exp(5), \exp(5)\rangle \\
+        & = \langle 15+\exp(5), 8+\exp(5) \rangle
+
+    \end{align}
+$$
+可以验证
+$$
+\begin{align}
+    f(x) = 3 \cdot 5 + e^5 \\
+    \nabla_v f(x) = \nabla f(x)\cdot v &= \left[ \frac{\partial f(x)}{\partial x_1} \frac{\partial f(x)}{\partial x_1}\right]\left [\begin{array}{c} 1 \\ 1 \end{array}\right] \\
+    &= x_2 + x_1+e^{x_2} \\
+    & = 8 + e^5
+    &
+\end{align}
+$$
+但是这种表示方式不够直接, 并不能直观地反应出数值在公式中的流动和被运算符处理的情况, 因此我们用计算图的方式来表示. 例如下面这个公式
 $$
     f(x_1, x_2) = \left[ \sin{\frac{x_1}{x_2}} + \frac{x_1}{x_2} - e^{x_2}\right] \times \left[ \frac{x_1}{x_2} - e^{x_2} \right]
 $$
 
-用二元数追踪其计算过程有
+计算图表示为
 
-$$
+![/image/chapter2/comgraph.png]
 
-    x = [3.7 12.6]^\mathsf T
-    v = []
+这张图可以理解为一边计算原始值(primal), 同时计算切线值(Tangent). 因此随着输入传入, 流经整个计算过程,
 
-$$
+![/exec.png]
 
-# TODO: 梯度向量积
+以上是仅有一个输入的情况, 也可以同时有多个输入并得到多个结果. 这在数学上的表达就是雅可比矩阵...
+
+## 正向模式的实现
+
+### 运算符重载
+
+### 源码转译
+
+## 反向模式
+
+## 如何选择正向/反向模式
