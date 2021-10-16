@@ -1,8 +1,8 @@
 
 |English  |中文      |
 |---------|---------|
-|Row1     |         |
-|Row2     |         |
+|in-place     |   原位      |
+|out-bound     |    越界     |
 |Row3     |         |
 |Row4     |         |
 |Row5     |         |
