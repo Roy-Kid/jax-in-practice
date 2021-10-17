@@ -53,8 +53,9 @@ ans = absstruct(b - a)
 # b.shape: (N, 1)
 
 ans = vmap(absstruct, (0, None))(b, a)
-
 ```
+
+TODO: `pmap`
 
 ## 随机数
 
@@ -110,6 +111,91 @@ TypeError                                 Traceback (most recent call last)
 ----> 2 lax.add(1, 1.0)  # jax.lax API requires explicit type promotion.
 
 TypeError: add requires arguments to have the same dtypes, got int32, float32.
+```
+
+# 不同2: Static 与 Traced
+
+JAX是不鼓励对变量进行修改的, 因为原位修改以后, JAX就难以追踪对变量进行的运算. 回忆第二章所讲的__, 每一次操作, 或者说每一个算子所用到变量上, 总是要记录tangent或者adjoint. 如此就要引入两个概念, static和traced. 
+
+static指的是能在jit编译时确定下来的变量(evaluated at compile-time). 
+
+```python
+
+def square(x):
+    return x**2
+jit_square = jit(square)
+```
+当我们对一个函数进行jit的时候, 其中的数值能够即时地确定下来, 而不是在调用这个函数的时候才能确定, 这个就成为编译时确定的. 因为它不随输入的改变而改变, 所以称为static. 我们可以使用`jax.make_jaxpr`看一看编译完的状态
+
+```python
+jax.make_jaxpr(square)(jnp.array([1., 2.,]))
+
+{ lambda  ; a.
+  let b = integer_pow[ y=2 ] a
+  in (b,) }
+```
+可以看到编译的结果与输入`a`的值无关, 而直接把`2`确定了下来. 因此, 如果说函数中一个值与输入有关, 就会出现
+
+```python
+@jit
+def f(x):
+  return x.reshape(jnp.array(x.shape).prod())
+
+x = jnp.ones((2, 3))
+f(x)
+
+---------------------------------------------------------------------------
+ConcretizationTypeError                   Traceback (most recent call last)
+<ipython-input-26-5fa933a68063> in <module>()
+      7 
+      8 x = jnp.ones((2, 3))
+----> 9 f(x)
+
+ConcretizationTypeError: Abstract tracer value encountered where concrete value is expected.
+
+The error arose in jax.numpy.reshape.
+While tracing the function f at <ipython-input-26-5fa933a68063>:4, this value became a tracer due to JAX operations on these lines:
+
+  operation c:int32[] = reduce_prod[ axes=(0,) ] b:int32[2]
+    from line <ipython-input-26-5fa933a68063>:6 (f)
+
+See https://jax.readthedocs.io/en/latest/faq.html#abstract-tracer-value-encountered-where-concrete-value-is-expected-error for more information.
+
+Encountered tracer value: Traced<ShapedArray(int32[])>with<DynamicJaxprTrace(level=0/1)>
+
+```
+错误告诉你`jax.numpy.reshape`在编译过程中是一个tracer, 而不是static. 这就意味着它在编译的时候无法将这个操作确定下来. 我们看看其中都是什么变量
+
+```python
+
+@jit
+def f(x):
+  print(f"x = {x}")
+  print(f"x.shape = {x.shape}")
+  print(f"jnp.array(x.shape).prod() = {jnp.array(x.shape).prod()}")
+  # comment this out to avoid the error:
+  # return x.reshape(jnp.array(x.shape).prod())
+
+f(x)
+
+x = Traced<ShapedArray(float32[2,3])>with<DynamicJaxprTrace(level=0/1)>
+x.shape = (2, 3)
+jnp.array(x.shape).prod() = Traced<ShapedArray(int32[])>with<DynamicJaxprTrace(level=0/1)>
+```
+
+传入的x是traced, `x.shape`是static. 但是, 当`jnp.array`和`jnp.prod`作用到这个静态变量上, 就会转换成traced变量. 而`reshape()`操作必须要求一个static的变量输入, 从而发生了错误. 解决这种冲突的办法就在`jnp`和`np`上. 既然JAX完全支持Numpy的API, 我们为什么还要把jnp和np区分开? 我们可以用numpy处理static, 在jit时进行优化, 用jax.numpy处理traced, 在运行时优化. 对于上面的函数, 我们可以写成
+
+```python
+from jax import jit
+import jax.numpy as jnp
+import numpy as np
+
+@jit
+def f(x):
+  return x.reshape((np.prod(x.shape),))
+
+f(x)
+
 ```
 
 # 异步调度
@@ -173,10 +259,6 @@ Wall time: 4.92 ms
 ```
 阻塞但不将结果传回主机端通常会更快一些，也是做基准测试的最佳选择。
 
-## grad
-
-
-
 ## to JIT or not to JIT, it's a question
 
 JAX的时候绕不开JIT. 即便你不考虑运行时间只要求一个正确结果, 那很多JAX方法都会隐式地进行JIT. 可以说, JAX的编程离不开三件事, jnp, grad 和jit. 
@@ -220,3 +302,31 @@ True
 1000 loops, best of 3: 452 µs per loop
 ```
 
+## 纯函数
+
+必须要在JAX的风格下编程, 否则轻则速度缓慢, 重则结果错误. JAX转换和编译被设计为只在纯函数(pure function)上工作：所有输入数据都通过函数参数传递，所有结果都通过函数结果输出。换言之, JAX编程的"最小粒度"应该是函数. JAX并不是通过Python解释器运行的, 如果输入的函数不是要求的纯函数形式, 并不能保证行为符合预期.
+
+例如, 如果在函数中使用`print()`, 并不一定是按照顺序输出
+
+再比如, 如果函数调用外部的参数(而不是通过函数参数传入), 结果可能不一致
+
+此外, JAX的函数内不应该用原生的控制流. python中的可迭代对象通过引入一个状态来指示下一个对象(回忆__next__的实现), 这就违背了纯函数的原则, 不能把所有的功能实现放在一个函数中. 因此, JAX提供了一套自己的控制流
+
+## JAX中的控制流
+
+需要使用控制流的第一种情况是控制流依赖于输入, 不能在jit时确定下来. 
+
+```python
+@jit
+def f(x):
+  if x < 3:
+    return 3. * x ** 2
+  else:
+    return -4 * x
+
+# This will fail!
+try:
+  f(2)
+except Exception as e:
+  print("Exception {}".format(e))
+```
